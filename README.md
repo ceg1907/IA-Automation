@@ -199,7 +199,7 @@ Los tickets de urgencia Baja o Media, en cambio, se envían directo sin pedir ap
 
 ## 📊 Dashboard de Control Ejecutivo
 
-🔗 [Ver vista pública de Notion](ENLACE_PUBLICO_NOTION) <!-- COMPLETAR: pegar el link generado en Notion → Publicar -->
+🔗 [Ver vista pública de Notion](https://guttural-bronze-77e.notion.site/Sistema-de-Triage-de-Soporte-3daadc3ec10280a28abfed47d4bcb033)
 
 Este panel permite que el dueño del negocio o el equipo de soporte vea en tiempo real cómo está funcionando el sistema, sin necesidad de entrar a n8n. Muestra:
 
@@ -212,17 +212,46 @@ Este panel permite que el dueño del negocio o el equipo de soporte vea en tiemp
 
 ---
 
+## 🖼️ Evidencia de Ejecución
+
+### ✅ Happy Path — Entrada por Email
+Ejecución exitosa disparada por el Gmail Trigger: extracción de datos, creación del ticket en Notion y análisis con IA.
+![Happy path - entrada por email](./docs/screenshots/happy-path-parte1.png)
+
+### ✅ Happy Path — Flujo completo (Notion)
+Ejecución completa de punta a punta: desde la detección del ticket hasta la respuesta final al cliente, pasando por el punto de aprobación humana.
+![Happy path - flujo completo](./docs/screenshots/happy-path-parte2.png)
+
+### 📧 Human-in-the-loop — Email de aprobación
+Correo de aprobación enviado antes de responder al cliente, con los datos del ticket, el mensaje original y la respuesta sugerida por la IA.
+![Email de aprobación humana](./docs/screenshots/aprobacion-por-gmail.png)
+
+### ⚠️ Camino infeliz — Datos faltantes
+Ejecución de prueba con un ticket sin mensaje: el sistema lo detecta y lo deriva a la ruta de error sin frenar el resto del flujo.
+![Error - datos faltantes](./docs/screenshots/datos-faltantes-unhappy-path.png)
+
+### ⚠️ Camino infeliz — Falla de API
+Ejecución de prueba simulando una falla de API: el sistema registra el incidente en el Log de Errores.
+![Error - falla de API](./docs/screenshots/falla-api-unhappy-path.png)
+
+---
+
 ## 📁 Contenido del repositorio
 
 ```
 /docs
   arquitectura.pdf
-  workflow.json
+  arquitectura.png
+  sistema_de_tickets_de_soporte.json
   /screenshots
-    ...
+    happy-path-parte1.png
+    happy-path-parte2.png
+    aprobacion-por-gmail.png
+    datos-faltantes-unhappy-path.png
+    falla-api-unhappy-path.png
 README.md
 ```
 
 - 📄 [PDF de arquitectura](./docs/arquitectura.pdf)
-- 🧩 [JSON del flujo de n8n](./docs/workflow.json)
+- 🧩 [JSON del flujo de n8n](./docs/sistema_de_tickets_de_soporte.json)
 - 🖼️ [Capturas de evidencia](./docs/screenshots)
