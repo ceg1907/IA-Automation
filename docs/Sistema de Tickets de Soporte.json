@@ -1,0 +1,1099 @@
+{
+  "name": "Sistema de Tickets de Soporte",
+  "nodes": [
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -16,
+        -32
+      ],
+      "id": "10b4c70a-5226-424e-b378-6e1008718222",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "pFTfrwC22t5Oz7JV",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\"Categoria\": \"Técnico\",\n\"Urgencia\": \"Alta\",\n\"Sentimiento\": \"Negativo\",\n\"respuesta_sugerida\": \"texto de ejemplo\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        -32
+      ],
+      "id": "30ab551d-86e7-416b-925f-7b227564f673",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3daadc3e-c102-80ad-83d9-000b22d5141f",
+          "mode": "list",
+          "cachedResultName": "Tickets",
+          "cachedResultUrl": "https://app.notion.com/p/3daadc3ec10280eba60ff3aba9faebf6"
+        }
+      },
+      "type": "n8n-nodes-base.notionTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -624,
+        -192
+      ],
+      "id": "95143d0b-a426-4010-8b1b-7cedc83e7639",
+      "name": "Detectar Ticket Nuevo",
+      "credentials": {
+        "notionApi": {
+          "id": "dotP3jwlceoSxQBR",
+          "name": "Notion Triage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "12050fa4-5d80-4b17-a857-8b3399eb5b49",
+              "leftValue": "={{ $json.Estado }}",
+              "rightValue": "Pendiente",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -432,
+        -192
+      ],
+      "id": "9eec5fa0-5dde-40ff-bd32-6956f2e787a7",
+      "name": "Filtrar Solo Pendientes"
+    },
+    {
+      "parameters": {
+        "promptType": "=define",
+        "text": "=Sos un asistente de soporte al cliente. Analizá el siguiente ticket y respondé ÚNICAMENTE en formato JSON con esta estructura exacta: {\"categoria\": \"Técnico|Facturación|Cancelación|Consulta General\", \"urgencia\": \"Baja|Media|Alta|Crítica\", \"sentimiento\": \"Positivo|Neutral|Negativo\", \"respuesta_sugerida\": \"texto de respuesta profesional y empática en español\"}.\n\nAsunto: {{ $json.Asunto }}\nMensaje: {{ $json[\"Mensaje Original\"] }}\nCliente: {{ $json[\"Nombre Cliente\"] }}\nEmail Cliente: {{ $json[\"Email Cliente\"] }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Sos un asistente de triage de soporte al cliente. Analizás tickets y devolvés únicamente una clasificación estructurada en JSON, sin texto adicional."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -16,
+        -208
+      ],
+      "id": "bca892a4-72e9-4280-a881-70b439670441",
+      "name": "Analizar Ticket con IA",
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Detectar Ticket Nuevo').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Categoria|select",
+              "selectValue": "={{ $json.output.Categoria }}"
+            },
+            {
+              "key": "Urgencia|select",
+              "selectValue": "={{ $json.output.Urgencia }}"
+            },
+            {
+              "key": "Sentimiento|select",
+              "selectValue": "={{ $json.output.Sentimiento }}"
+            },
+            {
+              "key": "Respuesta Sugerida IA|rich_text",
+              "textContent": "={{ $json.output.respuesta_sugerida }}"
+            },
+            {
+              "key": "Estado|select",
+              "selectValue": "Procesado por IA"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        288,
+        -320
+      ],
+      "id": "22f62e7e-628e-4849-a49a-12eb884fd724",
+      "name": "Guardar Análisis en Notion",
+      "credentials": {
+        "notionApi": {
+          "id": "dotP3jwlceoSxQBR",
+          "name": "Notion Triage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dc1a5afc-61dc-4bb5-9327-db94292eceaa",
+              "leftValue": "={{ $json.property_urgencia }}",
+              "rightValue": "Alta",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "3a1b87d0-5744-41fd-aa78-edf68d8d2636",
+              "leftValue": "={{ $json.property_urgencia }}",
+              "rightValue": "Critica",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        528,
+        -240
+      ],
+      "id": "610474d3-6224-4405-9a09-9181a6223c45",
+      "name": "Evaluar si Requiere Aprobación"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "cristinag1907@gmail.com",
+        "subject": "=Aprobación requerida:\nTicket {{ $('Guardar Análisis en Notion').item.json.property_categoria }} - Urgencia {{ $('Guardar Análisis en Notion').item.json.property_urgencia }}",
+        "message": "=Hola,\n\nUn ticket de soporte requiere tu aprobación antes de enviarse al cliente.\n\n📋 DATOS DEL TICKET\nCliente: {{ $('Guardar Análisis en Notion').item.json.property_nombre_cliente }}\nEmail: {{ $('Guardar Análisis en Notion').item.json.property_email_cliente }}\nCategoría: {{ $('Guardar Análisis en Notion').item.json.property_categoria }}\nUrgencia: {{ $('Guardar Análisis en Notion').item.json.property_urgencia }}\nSentimiento: {{ $('Guardar Análisis en Notion').item.json.property_sentimiento }}\n\n📝 MENSAJE ORIGINAL DEL CLIENTE\n{{ $('Guardar Análisis en Notion').item.json.property_mensaje_original }}\n\n🤖 RESPUESTA SUGERIDA POR LA IA\n{{ $('Guardar Análisis en Notion').item.json.property_respuesta_sugerida_ia }}\n\nPor favor, revisá y aprobá o rechazá el envío usando los botones de abajo.",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Aprobar",
+            "disapproveLabel": "Rechazar"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 48
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        736,
+        -352
+      ],
+      "id": "71d16180-4d87-494b-970b-918aab400d1e",
+      "name": "Solicitar Aprobación Humana (Email)",
+      "webhookId": "80df21db-bf47-4221-b67c-932fc5af2893",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "snjxCMKyWy6fm8xD",
+          "name": "Gmail Triage"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5be3a81c-701f-40b8-a514-78153b8f198b",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        960,
+        -368
+      ],
+      "id": "19ef68c1-8ff4-478d-b026-1bc51c897e00",
+      "name": "Verificar Decisión Humana"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Guardar Análisis en Notion').item.json.property_email_cliente }}",
+        "subject": "=Respuesta a tu consulta - {{ $('Guardar Análisis en Notion').item.json.property_asunto }}",
+        "message": "={{ $('Guardar Análisis en Notion').item.json.property_respuesta_sugerida_ia }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        -192
+      ],
+      "id": "e766fc91-12b5-49d6-ade4-d3f1dd63ab37",
+      "name": "Enviar Respuesta al Cliente",
+      "webhookId": "4877ab38-285d-41b0-ba0b-176bee48fe1c",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "snjxCMKyWy6fm8xD",
+          "name": "Gmail Triage"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Detectar Ticket Nuevo').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Estado|select",
+              "selectValue": "Enviado"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1488,
+        -192
+      ],
+      "id": "2635711d-a3f3-4238-bb72-9658300e0d02",
+      "name": "Marcar como Enviado",
+      "credentials": {
+        "notionApi": {
+          "id": "dotP3jwlceoSxQBR",
+          "name": "Notion Triage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Detectar Ticket Nuevo').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Estado|select",
+              "selectValue": "Rechazado"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1344,
+        -352
+      ],
+      "id": "b1f7c5e8-9ae7-4500-a6fe-2b0febdc0a98",
+      "name": "Marcar como Rechazado",
+      "credentials": {
+        "notionApi": {
+          "id": "dotP3jwlceoSxQBR",
+          "name": "Notion Triage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "q": "To:cristinag1907@gmail.com Subject:(ticket OR soporte)"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        80,
+        -832
+      ],
+      "id": "bddd6ecc-134e-4cdf-bbf1-67aa01fe8c31",
+      "name": "Detectar Email de Cliente",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "snjxCMKyWy6fm8xD",
+          "name": "Gmail Triage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Extraé los datos del siguiente correo:\\n\\nAsunto original: {{ $json.Subject }}\\nRemitente: {{ $json.From }}\\nCuerpo: {{ $json.snippet }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Sos un asistente que extrae y estructura datos de correos de clientes de soporte.\nTu única tarea es identificar tres datos a partir del asunto, el remitente y el cuerpo del correo: el nombre del cliente, un asunto breve y claro, y el mensaje completo del reclamo.\n\nReglas estrictas:\n- No inventes ni completes información que no esté explícitamente presente en el correo.\n- Si no podés identificar el nombre del cliente con certeza, devolvé el campo \"nombre_cliente\" como cadena vacía \"\".\n- Si el asunto original ya es claro y descriptivo, podés usarlo tal cual; si es vago o está vacío, generá uno breve basado en el contenido del mensaje.\n- El campo \"mensaje_original\" debe contener el reclamo del cliente limpio, sin firmas, saludos genéricos (\"Hola\", \"Gracias\", \"Saludos\") ni encabezados de email."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        304,
+        -832
+      ],
+      "id": "d9d33b6f-984b-42eb-a6f3-89a11909a8de",
+      "name": "Extraer Datos del Email"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        288,
+        -608
+      ],
+      "id": "b985eee3-bce0-499b-84d8-50322c793c4a",
+      "name": "Gemini - Extracción",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "pFTfrwC22t5Oz7JV",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"nombre_cliente\": \"Laura Fernández\",\n  \"asunto\": \"No puede acceder a su cuenta\",\n  \"mensaje_original\": \"Intenté ingresar a mi cuenta varias veces con mi contraseña habitual pero el sistema me indica que es incorrecta. Ya probé restablecerla dos veces y sigo sin poder acceder. Necesito resolver esto lo antes posible porque tengo pagos pendientes que gestionar desde mi cuenta.\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        464,
+        -608
+      ],
+      "id": "bf869358-0d6b-41de-a6fa-192a15b02d3b",
+      "name": "Parser de Extracción"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3daadc3e-c102-80ad-83d9-000b22d5141f",
+          "mode": "list",
+          "cachedResultName": "Tickets",
+          "cachedResultUrl": "https://app.notion.com/p/3daadc3ec10280eba60ff3aba9faebf6"
+        },
+        "title": "=TCK-{{ $now.format('yyyyMMddHHmmss') }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Asunto|rich_text",
+              "textContent": "={{ $json.output.asunto }}"
+            },
+            {
+              "key": "Mensaje Original|rich_text",
+              "textContent": "={{ $json.output.mensaje_original }}"
+            },
+            {
+              "key": "Nombre Cliente|rich_text",
+              "textContent": "={{ $json.output.nombre_cliente || $('Detectar Email de Cliente').item.json.From.split('<')[0].trim() }}"
+            },
+            {
+              "key": "Email Cliente|email",
+              "emailValue": "={{ $('Detectar Email de Cliente').item.json.From.match(/<(.+)>/) ? $('Detectar Email de Cliente').item.json.From.match(/<(.+)>/)[1] : $('Detectar Email de Cliente').item.json.From }}"
+            },
+            {
+              "key": "Fecha Recepción|date",
+              "date": "={{$now}}",
+              "timezone": "America/Argentina/Buenos_Aires"
+            },
+            {
+              "key": "Estado|select",
+              "selectValue": "Pendiente"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        672,
+        -832
+      ],
+      "id": "cb5ecef6-cc21-4739-990b-eea130ed3d83",
+      "name": "Crear Ticket en Notion",
+      "credentials": {
+        "notionApi": {
+          "id": "dotP3jwlceoSxQBR",
+          "name": "Notion Triage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 📧 Entrada por Email\n\n",
+        "height": 432,
+        "width": 944
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -16,
+        -912
+      ],
+      "typeVersion": 1,
+      "id": "65cc440e-151a-4918-b911-297493017bdb",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## 🤖 Análisis con IA",
+        "height": 464,
+        "width": 1136,
+        "color": "#325676"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -672,
+        -352
+      ],
+      "typeVersion": 1,
+      "id": "de5bb8e4-2fc5-4675-b6a1-567a7ad16524",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## ✅ Human in the Loop",
+        "height": 368,
+        "width": 640,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        480,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "0e6f6fcb-5cf7-4cfc-ae04-55da32afa0be",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## 📤 Salida al Cliente",
+        "height": 432,
+        "width": 528,
+        "color": "#6D4A69"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1136,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "19e470a2-bd02-4bde-a450-fad271b9af02",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e638c981-0b90-4b7e-847d-2594ecb45461",
+              "leftValue": "={{ $('Detectar Ticket Nuevo').item.json[\"Mensaje Original\"] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -240,
+        -192
+      ],
+      "id": "e175b74b-e0e5-4d92-bc78-93ce0ff8c8ae",
+      "name": "Verificar Datos Completos"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Detectar Ticket Nuevo').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Estado|select",
+              "selectValue": "Error"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        192,
+        224
+      ],
+      "id": "912354b6-c846-49dd-9e90-8dfadc1762aa",
+      "name": "Marcar como Error",
+      "credentials": {
+        "notionApi": {
+          "id": "dotP3jwlceoSxQBR",
+          "name": "Notion Triage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## ⚠️ Error: Datos Faltantes\n",
+        "height": 256,
+        "width": 480,
+        "color": "#472424"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -96,
+        160
+      ],
+      "typeVersion": 1,
+      "id": "410cb8dc-1fa4-464b-b1a6-ab1df8da8431",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## ⚠️ Error: Falla de API",
+        "height": 256,
+        "width": 480,
+        "color": "#472424"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1232,
+        160
+      ],
+      "typeVersion": 1,
+      "id": "0a9cd96c-a0ba-47d5-a4cb-ded1a606959c",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Detectar Ticket Nuevo').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Estado|select",
+              "selectValue": "Error"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1520,
+        224
+      ],
+      "id": "e932547c-188c-4c48-bcf1-694d62f49ed0",
+      "name": "Marcar como Error en Notion",
+      "credentials": {
+        "notionApi": {
+          "id": "dotP3jwlceoSxQBR",
+          "name": "Notion Triage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3daadc3e-c102-80f2-9981-000b5efc6a5c",
+          "mode": "list",
+          "cachedResultName": "Log de Errores",
+          "cachedResultUrl": "https://app.notion.com/p/3daadc3ec1028003887ee03d856ce153"
+        },
+        "title": "=ERR-{{ $now.format('yyyyMMddHHmmss') }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Tipo de Error|select",
+              "selectValue": "Datos faltantes"
+            },
+            {
+              "key": "Detalle|rich_text",
+              "textContent": "=Ticket sin Mensaje Original. ID: {{ $json.id }}"
+            },
+            {
+              "key": "Fecha|date",
+              "date": "={{$now}}",
+              "timezone": "America/Argentina/Buenos_Aires"
+            },
+            {
+              "key": "Ticket Relacionado|relation",
+              "relationValue": [
+                "={{$json.id}}"
+              ]
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        -16,
+        224
+      ],
+      "id": "e084fb33-e1ff-44be-a831-fd45f0761563",
+      "name": "Datos Faltantes",
+      "credentials": {
+        "notionApi": {
+          "id": "dotP3jwlceoSxQBR",
+          "name": "Notion Triage"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3daadc3e-c102-80f2-9981-000b5efc6a5c",
+          "mode": "list",
+          "cachedResultName": "Log de Errores",
+          "cachedResultUrl": "https://app.notion.com/p/3daadc3ec1028003887ee03d856ce153"
+        },
+        "title": "=ERR-{{ $now.format('yyyyMMddHHmmss') }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Tipo de Error|select",
+              "selectValue": "API caída"
+            },
+            {
+              "key": "Detalle|rich_text",
+              "textContent": "={{ $json.error }}"
+            },
+            {
+              "key": "Fecha|date",
+              "date": "={{ $now }}",
+              "timezone": "America/Argentina/Buenos_Aires"
+            },
+            {
+              "key": "Ticket Relacionado|relation",
+              "relationValue": [
+                "={{ $('Detectar Ticket Nuevo').item.json.id }}"
+              ]
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1296,
+        224
+      ],
+      "id": "23a3d16c-dff7-4171-91bd-69fd6f66872a",
+      "name": "Falla de API",
+      "credentials": {
+        "notionApi": {
+          "id": "dotP3jwlceoSxQBR",
+          "name": "Notion Triage"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Detectar Email de Cliente": [
+      {
+        "json": {
+          "id": "1a0a567eacf1838a",
+          "threadId": "1a0a567eacf1838a",
+          "snippet": "Hola, Mi nombre es Laura Fernández y necesito ayuda urgente. Intenté ingresar a mi cuenta varias veces con mi contraseña habitual pero el sistema me indica que es incorrecta. Ya probé restablecerla dos",
+          "payload": {
+            "mimeType": "multipart/alternative"
+          },
+          "sizeEstimate": 7923,
+          "historyId": "528500",
+          "internalDate": "1789481436000",
+          "labels": [
+            {
+              "id": "INBOX",
+              "name": "INBOX"
+            },
+            {
+              "id": "IMPORTANT",
+              "name": "IMPORTANT"
+            },
+            {
+              "id": "CATEGORY_PERSONAL",
+              "name": "CATEGORY_PERSONAL"
+            },
+            {
+              "id": "UNREAD",
+              "name": "UNREAD"
+            }
+          ],
+          "From": "Cristina Gonzalez <gonzalezc586@gmail.com>",
+          "Subject": "Ticket: No puedo acceder a mi cuenta",
+          "To": "cristinag1907@gmail.com"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analizar Ticket con IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Analizar Ticket con IA",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar Ticket Nuevo": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Solo Pendientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Solo Pendientes": {
+      "main": [
+        [
+          {
+            "node": "Verificar Datos Completos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analizar Ticket con IA": {
+      "main": [
+        [
+          {
+            "node": "Guardar Análisis en Notion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falla de API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar Análisis en Notion": {
+      "main": [
+        [
+          {
+            "node": "Evaluar si Requiere Aprobación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluar si Requiere Aprobación": {
+      "main": [
+        [
+          {
+            "node": "Solicitar Aprobación Humana (Email)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar Respuesta al Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solicitar Aprobación Humana (Email)": {
+      "main": [
+        [
+          {
+            "node": "Verificar Decisión Humana",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falla de API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Decisión Humana": {
+      "main": [
+        [
+          {
+            "node": "Enviar Respuesta al Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar como Rechazado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Respuesta al Cliente": {
+      "main": [
+        [
+          {
+            "node": "Marcar como Enviado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falla de API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar Email de Cliente": {
+      "main": [
+        [
+          {
+            "node": "Extraer Datos del Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer Datos del Email": {
+      "main": [
+        [
+          {
+            "node": "Crear Ticket en Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Extracción": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extraer Datos del Email",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser de Extracción": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Extraer Datos del Email",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Datos Completos": {
+      "main": [
+        [
+          {
+            "node": "Analizar Ticket con IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Datos Faltantes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos Faltantes": {
+      "main": [
+        [
+          {
+            "node": "Marcar como Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Falla de API": {
+      "main": [
+        [
+          {
+            "node": "Marcar como Error en Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d40774f9-55d9-4340-aadf-1eac5fb82c5b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2d318e29e0589b46cdf25186fae5bd152ed50fec321bf0eebfae3f54bd51cc8e"
+  },
+  "nodeGroups": [],
+  "id": "fMODdQRmlNWiyr1X",
+  "tags": []
+}
