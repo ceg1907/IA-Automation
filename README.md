@@ -115,6 +115,7 @@ Esto es lo que devuelve la IA después de leer un correo entrante:
 ```
 
 **4. Respuesta final al cliente** (nodo "Enviar Respuesta al Cliente")
+{% raw %}
 ```json
 {
   "sendTo": "={{ Email Cliente }}",
@@ -122,6 +123,7 @@ Esto es lo que devuelve la IA después de leer un correo entrante:
   "message": "={{ Respuesta Sugerida IA }}"
 }
 ```
+{% endraw %}
 
 ---
 
