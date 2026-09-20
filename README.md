@@ -35,7 +35,7 @@ Los tickets ingresan por email o mediante un formulario web. La IA los clasifica
 
 El sistema tiene dos formas de recibir tickets nuevos, que terminan alimentando la misma lógica:
 
-1. **Entrada por Email**: un nodo detecta un correo nuevo del cliente. Un agente de IA lee ese correo y saca el nombre del cliente, el asunto y el mensaje limpio (sin saludos ni firmas), y con eso crea el ticket en Notion con estado `Pendiente`.
+1. **Entrada por Email**: un nodo detecta un correo nuevo del cliente. Un agente de IA lee ese correo y saca el nombre del cliente, el asunto y el mensaje limpio (sin saludos ni firmas), y con eso crea el ticket en Notion con estado `Pendiente`. En paralelo, otro nodo marca el correo como leído, para que el próximo polling de Gmail no lo vuelva a detectar y lo procese dos veces.
 2. **Entrada por Formulario**: un formulario web (armado con el Form Trigger de n8n) pide los datos obligatorios: nombre completo, email, asunto y mensaje. Al enviarse, un nodo genera el ID del ticket y la fecha de recepción, y otro nodo crea el ticket ya completo en Notion, también con estado `Pendiente`.
 3. **Filtro de estado**: ambas entradas (Email y Formulario) se conectan directamente a este filtro, que descarta cualquier ticket que no esté en estado `Pendiente`, para no volver a procesar algo que ya se atendió.
 4. **Chequeo de datos**: un nodo revisa que el ticket tenga un mensaje cargado; si no lo tiene, lo manda por un camino separado que registra el problema sin frenar el resto del sistema.
@@ -197,7 +197,7 @@ El flujo tiene dos caminos separados para cuando algo sale mal, y en los dos cas
 
 - **Error: Datos Faltantes** — pasa cuando un ticket llega sin el mensaje del cliente cargado, que es el dato mínimo que la IA necesita para poder analizarlo. En ese caso, el sistema ni siquiera llama a la IA (para no gastar de más en un dato que ya sabemos que está incompleto): registra el problema en la tabla de errores, lo vincula al ticket correspondiente, y marca ese ticket como "Error" para que alguien lo revise a mano más tarde.
 
-- **Error: Falla de API** — pasa cuando falla la llamada a Gemini o a Gmail (por ejemplo, si la cuota se agotó o el servicio no respondió a tiempo). Los nodos más importantes están configurados para reintentar automáticamente 3 veces antes de darse por vencidos, así se cubren los fallos pasajeros de conexión. Si después de esos 3 intentos sigue sin funcionar, el sistema no se detiene: registra el error con el detalle real de lo que pasó, y marca el ticket como "Error", igual que en el otro caso.
+- **Error: Falla de API** — pasa cuando falla la llamada a Gemini o a Gmail (por ejemplo, si la cuota se agotó o el servicio no respondió a tiempo). Los nodos que llaman a estas APIs en los pasos críticos (extracción de datos del email, análisis con IA, solicitud de aprobación y respuesta al cliente) están configurados para reintentar automáticamente 3 veces antes de darse por vencidos, así se cubren los fallos pasajeros de conexión. Si después de esos 3 intentos sigue sin funcionar, el sistema no se detiene: registra el error con el detalle real de lo que pasó, y marca el ticket como "Error", igual que en el otro caso.
 
 En ambos casos, la idea es que un problema puntual en un ticket no afecte a los demás: cada ticket se procesa por separado.
 
