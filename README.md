@@ -8,7 +8,7 @@ Sistema autónomo de triage de tickets de soporte técnico, construido con n8n, 
 
 Este sistema resuelve el triage automático de tickets de soporte técnico para **NubeSoft** (cliente ficticio), una empresa de software en la nube para gestión y facturación. NubeSoft recibe muchas consultas diarias de sus clientes por problemas de acceso, cobros y cancelaciones, y necesitaba un sistema que clasifique automáticamente cada reclamo, redacte una respuesta y evite que un error de la IA llegue sin revisión a un cliente real.
 
-Los tickets ingresan por email o se cargan directamente en Notion. La IA los clasifica (categoría, urgencia, sentimiento) y solo se envía una respuesta al cliente después de que una persona la aprueba, cuando la urgencia es Alta o Crítica.
+Los tickets ingresan por email o mediante un formulario web. La IA los clasifica (categoría, urgencia, sentimiento) y solo se envía una respuesta al cliente después de que una persona la aprueba, cuando la urgencia es Alta o Crítica.
 
 ---
 
@@ -19,7 +19,7 @@ Los tickets ingresan por email o se cargan directamente en Notion. La IA los cla
 | Orquestador | n8n |
 | Base de datos / memoria | Notion |
 | Procesamiento IA (LLM) | Google Gemini (`gemini-3.1-flash-lite`) |
-| Canal de entrada | Gmail |
+| Canal de entrada | Gmail y Formulario web (n8n Form Trigger) |
 | Canal de salida | Gmail |
 | Human-in-the-loop | Gmail (nodo de espera de aprobación) |
 
@@ -36,12 +36,23 @@ Los tickets ingresan por email o se cargan directamente en Notion. La IA los cla
 El sistema tiene dos formas de recibir tickets nuevos, que terminan alimentando la misma lógica:
 
 1. **Entrada por Email**: un nodo detecta un correo nuevo del cliente. Un agente de IA lee ese correo y saca el nombre del cliente, el asunto y el mensaje limpio (sin saludos ni firmas), y con eso crea el ticket en Notion con estado `Pendiente`.
-2. **Entrada Manual**: otro nodo revisa cada minuto si apareció una página nueva en la base de Tickets de Notion (por ejemplo, si alguien la cargó a mano).
-3. **Filtro de estado**: un nodo descarta cualquier ticket que no esté en estado `Pendiente`, para no volver a procesar algo que ya se atendió.
+2. **Entrada por Formulario**: un formulario web (armado con el Form Trigger de n8n) pide los datos obligatorios: nombre completo, email, asunto y mensaje. Al enviarse, un nodo genera el ID del ticket y la fecha de recepción, y otro nodo crea el ticket ya completo en Notion, también con estado `Pendiente`.
+3. **Filtro de estado**: ambas entradas (Email y Formulario) se conectan directamente a este filtro, que descarta cualquier ticket que no esté en estado `Pendiente`, para no volver a procesar algo que ya se atendió.
 4. **Chequeo de datos**: un nodo revisa que el ticket tenga un mensaje cargado; si no lo tiene, lo manda por un camino separado que registra el problema sin frenar el resto del sistema.
 5. **Análisis con IA**: un agente de IA clasifica el ticket en Categoría, Urgencia y Sentimiento, y escribe una respuesta sugerida. Todo esto se guarda en el mismo ticket dentro de Notion.
 6. **Punto de aprobación**: si la urgencia es `Alta` o `Crítica`, el sistema manda un correo pidiendo aprobación humana y espera la respuesta antes de seguir. Si la urgencia es Baja o Media, sigue directo, sin pedir aprobación.
 7. **Respuesta al cliente**: se manda la respuesta por Gmail y se actualiza el estado del ticket en Notion (`Enviado` o `Rechazado`, según lo que haya decidido la persona).
+
+### 🔧 Decisión de diseño: por qué se reemplazó la carga manual por un Formulario
+
+La primera versión del sistema permitía cargar tickets a mano directamente en la tabla de Notion, detectados por un nodo que revisaba la base cada un minuto (polling). Esto trajo un problema: ese nodo detecta la fila apenas se crea, en el instante en que se escribe el primer dato — no cuando la persona termina de completarla. El resultado era que el sistema arrancaba a procesar un ticket a medio llenar (sin mensaje, sin estado), quedaba descartado por el filtro, y no se volvía a detectar después aunque se completara, porque ese nodo solo reacciona a filas nuevas, no a ediciones.
+
+Se evaluaron tres alternativas antes de decidir la solución final:
+- **Agregar una espera antes de filtrar**: descartada por ser un parche que no resuelve la causa del problema.
+- **Usar las automatizaciones nativas de Notion**: descartada porque esa función requiere un plan pago, y el proyecto usa el plan gratuito.
+- **Detectar cambios en vez de altas nuevas**: descartada porque generaría ejecuciones de más cada vez que el propio sistema edita esa misma fila (al guardar el análisis de la IA, por ejemplo), gastando cuota innecesariamente.
+
+La solución final fue reemplazar la carga manual por un **formulario web con campos obligatorios**: el ticket se crea ya completo desde el primer instante, eliminando por completo la ventana de "datos a medias". Además, tanto el Formulario como el Email se conectan ahora directamente al filtro de estado, sin depender de que un nodo de polling los "redescubra" — esto reduce la demora de detección y el consumo de ejecuciones.
 
 ---
 
@@ -88,7 +99,9 @@ Esto es lo que devuelve la IA después de leer un correo entrante:
 }
 ```
 
-**2. Creación de ticket en Notion** (nodo "Crear Ticket en Notion")
+**2. Creación de ticket en Notion** (nodos "Crear Ticket en Notion" y "Crear Ticket desde Formulario")
+
+Ambos nodos escriben en la misma tabla y con la misma estructura, sin importar si el dato vino del agente de IA que leyó un email, o directo de lo que la persona completó en el formulario:
 ```json
 {
   "resource": "databasePage",
@@ -203,30 +216,41 @@ Los tickets de urgencia Baja o Media, en cambio, se envían directo sin pedir ap
 
 🔗 [Ver vista pública de Notion](https://guttural-bronze-77e.notion.site/Sistema-de-Triage-de-Soporte-3daadc3ec10280a28abfed47d4bcb033)
 
-Este panel permite que el dueño del negocio o el equipo de soporte vea en tiempo real cómo está funcionando el sistema, sin necesidad de entrar a n8n. Muestra:
+El panel "KPI's" permite que el dueño del negocio o el equipo de soporte vea en tiempo real cómo está funcionando el sistema, sin necesidad de entrar a n8n. Se armó con tres vistas sobre la misma base de Tickets y Log de Errores:
 
-- **Cuántos tickets hay en total** y en qué estado está cada uno (`Pendiente`, `Procesado por IA`, `Enviado`, `Rechazado`, `Error`), agrupados en un tablero visual para ver de un vistazo en qué etapa está cada ticket.
-- **Cuántos tickets se resolvieron solos vs. cuántos necesitaron aprobación humana**, para entender qué tan seguido interviene una persona en el proceso.
-- **Cuántos tickets tuvieron algún error**, separados por tipo (`Datos faltantes` o `API caída`), tomando esa información directo de la tabla de Log de Errores — esto ayuda a ver si los problemas vienen más de datos incompletos o de que algún servicio externo falla seguido.
-- **Qué tipo de reclamos son los más comunes**, agrupando los tickets por Categoría y Urgencia, para que el negocio pueda ver en qué área conviene mejorar (por ejemplo, si la mayoría de los reclamos son de facturación).
+- **"Gráfico - Estado"**: un gráfico de torta que muestra la distribución de todos los tickets por `Estado` (`Error`, `Enviado`, `Procesado por IA`, etc.), con el total y el porcentaje de cada uno a simple vista.
+- **"Tickets por Estado"**: una tabla con dos columnas calculadas por fórmula (`Error` y `HITL`), cada una devolviendo 100% o 0% por ticket según corresponda. Como Notion (en el plan gratuito) no ofrece un rollup nativo de porcentaje, se aprovechó el resumen de columna **Average** de la propia vista de tabla para obtener el porcentaje agregado real, sin depender de una función paga.
+- **"Tasa de Errores"**: una tabla que cruza cada error registrado con su `Tipo de Error` (`Datos faltantes` / `API caída`) y el ticket relacionado, para ver de dónde vienen los problemas.
 
-> Estas métricas se arman directamente con las vistas que ya trae Notion (tableros, agrupaciones y filtros) sobre la misma base que usa el flujo de n8n — no hizo falta armar un panel aparte, así se mantiene todo dentro de las mismas herramientas gratuitas del proyecto.
+**Resultado de la muestra de prueba (8 tickets):**
+- 50% terminó en estado `Error` (4 de 8) — por datos faltantes o falla de API
+- 50% llegó a `Enviado` (4 de 8)
+- **25% requirió aprobación humana (HITL)** — 2 de los 8 tickets tuvieron Urgencia Alta (uno de Categoría Técnico, otro de Cancelación), pasaron por el email de aprobación, y los dos fueron aprobados y llegaron a `Enviado`
+- El otro 75% que llegó a `Enviado` (2 de 8, Urgencia Baja) se respondió automáticamente, sin pasar por aprobación humana
+
+Los tickets que terminaron en `Error` (como `TCK-ERROR-01` y `TCK-0333`) no tienen Categoría ni Urgencia asignada, porque el flujo los deriva a la ruta de error antes de llegar al nodo de Análisis con IA — es el comportamiento esperado, documentado en la sección de Manejo de Errores más arriba.
+
+> Estas métricas se arman directamente con vistas de Notion (gráfico, tabla con fórmulas, y el resumen de columna nativo) sobre la misma base que usa el flujo de n8n — no hizo falta un panel aparte, así se mantiene todo dentro de las herramientas gratuitas del proyecto.
 
 ---
 
 ## 🖼️ Evidencia de Ejecución
 
-### ✅ Happy Path — Entrada por Email
-Ejecución exitosa disparada por el Gmail Trigger: extracción de datos, creación del ticket en Notion y análisis con IA.
-![Happy path - entrada por email](./docs/screenshots/happy-path-parte1.png)
+### 📝 Entrada por Formulario
+El formulario web que reemplazó a la carga manual, con los 4 campos obligatorios que evitan tickets a medio completar.
+![Formulario de nuevo ticket](./docs/screenshots/entrada-por-formulario.png)
 
-### ✅ Happy Path — Flujo completo (Notion)
-Ejecución completa de punta a punta: desde la detección del ticket hasta la respuesta final al cliente, pasando por el punto de aprobación humana.
-![Happy path - flujo completo](./docs/screenshots/happy-path-parte2.png)
+### ✅ Happy Path — Entrada por Email
+Ejecución exitosa de punta a punta disparada por un correo nuevo: extracción de datos con IA, análisis, punto de aprobación y respuesta final al cliente.
+![Happy path - entrada por email](./docs/screenshots/happy-path-gmail.png)
+
+### ✅ Happy Path — Entrada por Formulario
+Ejecución exitosa de punta a punta disparada por el envío del formulario, mostrando el mismo recorrido completo hasta la respuesta al cliente.
+![Happy path - entrada por formulario](./docs/screenshots/happy-path-form.png)
 
 ### 📧 Human-in-the-loop — Email de aprobación
 Correo de aprobación enviado antes de responder al cliente, con los datos del ticket, el mensaje original y la respuesta sugerida por la IA.
-![Email de aprobación humana](./docs/screenshots/aprobacion-por-gmail.png)
+![Email de aprobación humana](./docs/screenshots/aprobación-por-gmail.png)
 
 ### ⚠️ Camino infeliz — Datos faltantes
 Ejecución de prueba con un ticket sin mensaje: el sistema lo detecta y lo deriva a la ruta de error sin frenar el resto del flujo.
@@ -246,9 +270,10 @@ Ejecución de prueba simulando una falla de API: el sistema registra el incident
   arquitectura.png
   sistema_de_tickets_de_soporte.json
   /screenshots
-    happy-path-parte1.png
-    happy-path-parte2.png
-    aprobacion-por-gmail.png
+    entrada-por-formulario.png
+    happy-path-gmail.png
+    happy-path-form.png
+    aprobación-por-gmail.png
     datos-faltantes-unhappy-path.png
     falla-api-unhappy-path.png
 README.md
