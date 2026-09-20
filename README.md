@@ -280,5 +280,5 @@ README.md
 ```
 
 - 📄 [PDF de arquitectura](./docs/arquitectura.pdf)
-- 🧩 [JSON del flujo de n8n](./docs/sistema_de_tickets_de_soporte.json)
+- 🧩 [JSON del flujo de n8n](./docs/sistema-de-tickets-de-soporte.json)
 - 🖼️ [Capturas de evidencia](./docs/screenshots)
