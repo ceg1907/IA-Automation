@@ -236,21 +236,21 @@ Los tickets que terminaron en `Error` (como `TCK-ERROR-01` y `TCK-0333`) no tien
 
 ## 🖼️ Evidencia de Ejecución
 
-### 📝 Entrada por Formulario
-El formulario web que reemplazó a la carga manual, con los 4 campos obligatorios que evitan tickets a medio completar.
-![Formulario de nuevo ticket](./docs/screenshots/entrada-por-formulario.png)
-
 ### ✅ Happy Path — Entrada por Email
 Ejecución exitosa de punta a punta disparada por un correo nuevo: extracción de datos con IA, análisis, punto de aprobación y respuesta final al cliente.
 ![Happy path - entrada por email](./docs/screenshots/happy-path-gmail.png)
+
+### 📧 Human-in-the-loop — Email de aprobación
+Correo de aprobación enviado antes de responder al cliente, con los datos del ticket, el mensaje original y la respuesta sugerida por la IA.
+![Email de aprobación humana](./docs/screenshots/aprobación-por-gmail.png)
 
 ### ✅ Happy Path — Entrada por Formulario
 Ejecución exitosa de punta a punta disparada por el envío del formulario, mostrando el mismo recorrido completo hasta la respuesta al cliente.
 ![Happy path - entrada por formulario](./docs/screenshots/happy-path-form.png)
 
-### 📧 Human-in-the-loop — Email de aprobación
-Correo de aprobación enviado antes de responder al cliente, con los datos del ticket, el mensaje original y la respuesta sugerida por la IA.
-![Email de aprobación humana](./docs/screenshots/aprobación-por-gmail.png)
+### 📝 Entrada por Formulario
+El formulario web que reemplazó a la carga manual, con los 4 campos obligatorios que evitan tickets a medio completar.
+![Formulario de nuevo ticket](./docs/screenshots/entrada-por-formulario.png)
 
 ### ⚠️ Camino infeliz — Datos faltantes
 Ejecución de prueba con un ticket sin mensaje: el sistema lo detecta y lo deriva a la ruta de error sin frenar el resto del flujo.
